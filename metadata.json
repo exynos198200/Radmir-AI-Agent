@@ -1,0 +1,10 @@
+{
+  "name": "Radmir AI Agent",
+  "description": "Desktop AI Agent with Vision, OCR, and Voice Control (React/Electron + Python)",
+  "requestFramePermissions": [
+    "microphone"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

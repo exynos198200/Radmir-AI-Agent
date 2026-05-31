@@ -1,11 +1,29 @@
-<div align="center">
+# Radmir AI Agent (REAL Strict Version)
 
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
+Эта версия Radmir AI Agent переписана с учетом строгих правил:
+ Никаких UI симуляций.
+ Полная прозрачность статусов выполнения системы (`REAL` / `MOCK` / `DISABLED`).
+ Реальный WebSocket канал, выполнение задач локально через PyAutoGUI.
+ Настоящая интеграция с микрофонным оборудованием через браузерный MediaRecorder API.
 
-  <h1>Built with AI Studio</h2>
+## Как это устроено?
 
-  <p>The fastest path from prompt to production with Gemini.</p>
+В отличие от многих фейковых "демо-агентов", **данная версия требует реально запущенного локального сервера** для реагирования на команды. Если сервер закрыт — система честно выдает ошибку WebSocket.
 
-  <a href="https://aistudio.google.com/apps">Start building</a>
+1. Пользователь вводит команду в чат или записывает реальный голос через микрофон.
+2. Сообщение (или аудиофайл) отправляется через WebSocket на сервер FastAPI (Python).
+3. Python обращается к ИИ (Gemini API), используя строгий системный промпт: разбить пользовательскую команду на атомарные шаги с возвратом JSON, где каждому шагу присвоен тег `REAL`, `MOCK` или `DISABLED`.
+4. Клиент (React) рендерит шаги, отображая этот честный статус.
+5. Экзекьютор бэкенда асинхронно исполняет команды, имитируя нажатия клавиатуры и мыши через `pyautogui`. На каждый шаг он пушит апдейт статуса (`in-progress` -> `completed`) через вебсокет в UI.
 
-</div>
+## Сборка и запуск
+
+```bash
+# Python бэкенд
+pip install -r backend/requirements.txt
+python -m backend.main
+
+# Node Frontend
+npm install
+npm run electron:dev
+```

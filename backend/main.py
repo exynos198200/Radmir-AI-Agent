@@ -10,9 +10,14 @@ from dotenv import load_dotenv
 # this allows users of the compiled .exe to simply place a .env file next to it.
 load_dotenv()
 
-from .agent.processor import AgentProcessor
-from .agent.memory import MemoryManager
-from .agent.executor import LocalExecutor
+try:
+    from .agent.processor import AgentProcessor
+    from .agent.memory import MemoryManager
+    from .agent.executor import LocalExecutor
+except ImportError:
+    from agent.processor import AgentProcessor
+    from agent.memory import MemoryManager
+    from agent.executor import LocalExecutor
 
 app = FastAPI(title="Radmir AI Agent API - REAL")
 

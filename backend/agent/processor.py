@@ -37,8 +37,9 @@ class AgentProcessor:
   ]
 }
 Только реальные действия (press) с tag: REAL. Не симулируй."""
+            model_name = os.environ.get("GEMINI_MODEL", "gemini-2.5-flash")
             response = self.client.models.generate_content(
-                model='gemini-2.5-pro',
+                model=model_name,
                 contents=system_prompt + "\nЗадача: " + command
             )
             

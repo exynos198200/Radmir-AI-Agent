@@ -1,6 +1,5 @@
 import asyncio
 import pyautogui
-import keyboard
 
 class LocalExecutor:
     def __init__(self):

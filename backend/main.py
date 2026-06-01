@@ -4,6 +4,11 @@ import asyncio
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+from dotenv import load_dotenv
+
+# Load .env file from the current working directory, 
+# this allows users of the compiled .exe to simply place a .env file next to it.
+load_dotenv()
 
 from .agent.processor import AgentProcessor
 from .agent.memory import MemoryManager

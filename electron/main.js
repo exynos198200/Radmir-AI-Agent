@@ -37,11 +37,20 @@ function createWindow() {
 }
 
 function startPythonBackend() {
-  // In production, this points to the bundled python executable.
-  // In dev, assuming python is in PATH.
-  pythonProcess = spawn('python', ['-m', 'backend.main'], {
-      cwd: path.join(__dirname, '..')
-  });
+  const isPackaged = app.isPackaged;
+  
+  if (isPackaged) {
+    // In production, run the bundled executable
+    const executablePath = path.join(process.resourcesPath, 'backend-server.exe');
+    pythonProcess = spawn(executablePath, [], {
+        cwd: path.dirname(executablePath)
+    });
+  } else {
+    // In development, assume python is in PATH
+    pythonProcess = spawn('python', ['-m', 'backend.main'], {
+        cwd: path.join(__dirname, '..')
+    });
+  }
 
   pythonProcess.stdout.on('data', (data) => {
     console.log(`Python: ${data}`);

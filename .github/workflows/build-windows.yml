@@ -31,8 +31,8 @@ jobs:
         pip install pyinstaller
 
     - name: Build Python Backend
-      run: pyinstaller --name backend-server --onefile backend/main.py
-      # The resulting backend-server.exe will be inside /dist/
+      run: pyinstaller --name backend-server --onefile --distpath backend-dist backend/main.py
+      # The resulting backend-server.exe will be inside /backend-dist/
       
     - name: Install NPM dependencies
       run: npm install

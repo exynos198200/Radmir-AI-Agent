@@ -9,3 +9,7 @@ google-genai>=0.4.0
 sqlalchemy>=2.0.28
 pydantic>=2.7.0
 pyautogui>=0.9.54
+httpx[socks]
+g4f
+curl_cffi
+openai

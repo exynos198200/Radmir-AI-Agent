@@ -45,7 +45,7 @@ export const useStore = create<AppState>((set, get) => ({
   tasks: [],
   isRecording: false,
   connect: () => {
-    const socket = new WebSocket('ws://localhost:8000/ws');
+    const socket = new WebSocket('ws://localhost:8192/ws');
     
     socket.onopen = () => {
       set({ isConnected: true, ws: socket });

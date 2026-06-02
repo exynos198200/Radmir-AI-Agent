@@ -6,14 +6,27 @@ class AgentProcessor:
     def __init__(self, memory_manager):
         self.memory = memory_manager
         
-        api_key = os.environ.get("GEMINI_API_KEY")
-        if api_key:
-            self.client = genai.Client(api_key=api_key)
+        self.use_free_api = False
+        self.use_deepseek = False
+        
+        gemini_api_key = os.environ.get("GEMINI_API_KEY")
+        deepseek_api_key = os.environ.get("DEEPSEEK_API_KEY", "sk-7550e1e31d75425dbcf6d288842003a5")
+        
+        if deepseek_api_key and deepseek_api_key.strip():
+            self.use_deepseek = True
+            from openai import OpenAI
+            self.client = OpenAI(api_key=deepseek_api_key, base_url="https://api.deepseek.com/v1")
             self.enabled = True
+            print("Using DeepSeek API.")
+        elif gemini_api_key and gemini_api_key.strip():
+            self.client = genai.Client(api_key=gemini_api_key)
+            self.enabled = True
+            print("Using Gemini API.")
         else:
             self.client = None
-            self.enabled = False
-            print("WARNING: GEMINI_API_KEY not found.")
+            self.enabled = True
+            self.use_free_api = True
+            print("WARNING: API keys not found. Using Free API (g4f) fallback.")
 
     def process_command(self, command: str, image_context=None):
         self.memory.add_message("user", command)
@@ -28,6 +41,7 @@ class AgentProcessor:
             return reply, mock_tasks
 
         try:
+            import time
             system_prompt = """Ты системный процесс, управляющий ПК. Разбей задачу пользователя на системные шаги.
 Формат ответа строго JSON:
 {
@@ -38,13 +52,46 @@ class AgentProcessor:
 }
 Только реальные действия (press) с tag: REAL. Не симулируй."""
             model_name = os.environ.get("GEMINI_MODEL", "gemini-2.5-flash")
-            response = self.client.models.generate_content(
-                model=model_name,
-                contents=system_prompt + "\nЗадача: " + command
-            )
             
-            raw_text = response.text
-            clean_json = raw_text.replace("```json", "").replace("```", "").strip()
+            response_text = None
+            last_err = None
+            for _ in range(3):
+                try:
+                    if self.use_deepseek:
+                        resp = self.client.chat.completions.create(
+                            model="deepseek-chat",
+                            messages=[
+                                {"role": "system", "content": system_prompt},
+                                {"role": "user", "content": "Задача: " + command}
+                            ]
+                        )
+                        response_text = resp.choices[0].message.content
+                    elif self.use_free_api:
+                        from g4f.client import Client as G4FClient
+                        g4f_client = G4FClient()
+                        resp = g4f_client.chat.completions.create(
+                            model="gpt-4o",
+                            messages=[
+                                {"role": "system", "content": system_prompt},
+                                {"role": "user", "content": "Задача: " + command}
+                            ]
+                        )
+                        response_text = resp.choices[0].message.content
+                    else:
+                        response = self.client.models.generate_content(
+                            model=model_name,
+                            contents=system_prompt + "\nЗадача: " + command
+                        )
+                        response_text = response.text
+                    break
+                except Exception as ex:
+                    last_err = ex
+                    time.sleep(1.5)
+                    
+            if response_text is None:
+                raise last_err
+            
+            clean_json = response_text.replace("```json", "").replace("```", "").strip()
             
             try:
                 parsed = json.loads(clean_json)

@@ -9,6 +9,12 @@ google-genai>=0.4.0
 sqlalchemy>=2.0.28
 pydantic>=2.7.0
 pyautogui>=0.9.54
+pydirectinput>=1.0.4
+psutil>=5.9.8
+pywinauto>=0.6.8
+SpeechRecognition>=3.10.1
+PyAudio>=0.2.14
+PyQt5>=5.15.10
 httpx[socks]
 g4f
 curl_cffi

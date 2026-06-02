@@ -64,10 +64,26 @@ class AgentProcessor:
 {
   "reply": "Сообщение для юзера",
   "tasks": [
-    {"id": 1, "title": "Шаг", "status": "pending", "tag": "REAL", "action": "press|none", "key": "кнопка", "times": 1}
+    {
+       "id": 1, 
+       "title": "Описание шага", 
+       "status": "pending", 
+       "tag": "REAL", 
+       "action": "одно из [press, hotkey, launch, mouse_click, mouse_move, overlay_on, game_action, none]", 
+       ...специфичные поля для экшена
+    }
   ]
 }
-Только реальные действия (press) с tag: REAL. Не симулируй."""
+
+Специфичные поля:
+- press: "key" (например "space", "enter"), "times" (число)
+- hotkey: "keys" (массив строк, например ["win", "r"], ["ctrl", "c"])
+- launch: "program" (путь или команда), "process" (ожидаемый процесс, например "gta_sa.exe")
+- mouse_click: "button" ("left", "right")
+- mouse_move: "x" (число), "y" (число), "relative" (boolean)
+- game_action: "cmd" ("walk_forward" и т.д.)
+
+Все действия реально выполняются системой, возвращай только теги REAL. Симуляция запрещена."""
             
             response_text = None
             last_err = None

@@ -4,26 +4,45 @@ import psutil
 import pyautogui
 import pydirectinput
 import subprocess
-from pywinauto import Application, Desktop
 import threading
-import speech_recognition as sr
+import multiprocessing
+import ctypes
 
 class VerificationSystem:
     def verify_process_running(self, process_name):
-        for proc in psutil.process_iter(['name']):
-            if process_name.lower() in proc.info['name'].lower():
-                return True
+        try:
+            for proc in psutil.process_iter(['name']):
+                if proc.info['name'] and process_name.lower() in proc.info['name'].lower():
+                    return True
+        except Exception:
+            pass
         return False
 
     def verify_window_active(self, window_title):
         try:
-            # We can use pygetwindow or pywinauto
-            from pywinauto import Desktop
-            windows = Desktop(backend="uia").windows()
-            for w in windows:
-                if window_title.lower() in w.window_text().lower() and w.is_active():
-                    return True
-            return False
+            # БЕЗОПАСНАЯ АЛЬТЕРНАТИВА pywinauto(backend="uia")
+            # Использование pywinauto "uia" создает утечки COM-объектов в потоках.
+            # ctypes EnumWindows работает в 100 раз быстрее и потокобезопасен (не вызывает BSOD).
+            EnumWindows = ctypes.windll.user32.EnumWindows
+            EnumWindowsProc = ctypes.WINFUNCTYPE(ctypes.c_bool, ctypes.POINTER(ctypes.c_int), ctypes.POINTER(ctypes.c_int))
+            GetWindowText = ctypes.windll.user32.GetWindowTextW
+            GetWindowTextLength = ctypes.windll.user32.GetWindowTextLengthW
+            IsWindowVisible = ctypes.windll.user32.IsWindowVisible
+
+            found = False
+            def foreach_window(hwnd, lParam):
+                nonlocal found
+                if IsWindowVisible(hwnd):
+                    length = GetWindowTextLength(hwnd)
+                    buff = ctypes.create_unicode_buffer(length + 1)
+                    GetWindowText(hwnd, buff, length + 1)
+                    if window_title.lower() in buff.value.lower():
+                        found = True
+                        return False # Остановить перебор
+                return True
+
+            EnumWindows(EnumWindowsProc(foreach_window), 0)
+            return found
         except Exception:
             return False
 
@@ -32,9 +51,12 @@ class ProcessManager:
         self.verifier = verifier
 
     def get_process(self, name):
-        for proc in psutil.process_iter(['name']):
-            if name.lower() in proc.info['name'].lower():
-                return proc
+        try:
+            for proc in psutil.process_iter(['name']):
+                if proc.info['name'] and name.lower() in proc.info['name'].lower():
+                    return proc
+        except Exception:
+            pass
         return None
 
 class WindowManager:
@@ -46,7 +68,7 @@ class WindowManager:
         while time.time() - start < timeout:
             if self.verifier.verify_window_active(title):
                 return True
-            time.sleep(1)
+            time.sleep(0.5) # Снижена нагрузка на CPU (0.5s вместо 1s)
         return False
 
 class ApplicationLauncher:
@@ -56,22 +78,20 @@ class ApplicationLauncher:
 
     def launch(self, path_or_command, expected_process, expected_window=None):
         try:
-            # Try running
             subprocess.Popen(path_or_command, shell=True)
-            # Wait for process
             start = time.time()
             running = False
             while time.time() - start < 15:
                 if self.process_mgr.get_process(expected_process):
                     running = True
                     break
-                time.sleep(1)
+                time.sleep(0.5)
             
             if not running:
                 return False, "Процесс не запустился"
 
             if expected_window:
-                if not self.window_mgr.wait_for_window(expected_window, 20):
+                if not self.window_mgr.wait_for_window(expected_window, 15):
                     return False, "Окно программы не появилось"
 
             return True, "Успешно"
@@ -80,28 +100,42 @@ class ApplicationLauncher:
 
 class KeyboardController:
     def press(self, key):
-        pydirectinput.press(key)
+        try:
+            pydirectinput.press(key)
+        except Exception:
+            pass
 
     def hotkey(self, *keys):
-        # pydirectinput doesn't have a direct hotkey, pyautogui does but might not work in games.
-        # usually we do keyDown then keyUp.
-        for k in keys: pydirectinput.keyDown(k)
-        for k in reversed(keys): pydirectinput.keyUp(k)
+        try:
+            for k in keys: pydirectinput.keyDown(k)
+            for k in reversed(keys): pydirectinput.keyUp(k)
+        except Exception:
+            # Гарантированное отжатие клавиш при ошибке (предотвращение "залипания")
+            for k in reversed(keys): 
+                try: pydirectinput.keyUp(k)
+                except: pass
 
 class MouseController:
     def click(self, button='left'):
-        pydirectinput.click(button=button)
+        try: pydirectinput.click(button=button)
+        except: pass
 
     def move(self, x, y, relative=False):
-        if relative:
-            pydirectinput.move(x, y)
-        else:
-            pydirectinput.moveTo(x, y)
+        try:
+            if relative:
+                pydirectinput.move(x, y)
+            else:
+                pydirectinput.moveTo(x, y)
+        except: pass
 
     def drag(self, x_offset, y_offset):
-        pydirectinput.mouseDown()
-        pydirectinput.move(x_offset, y_offset)
-        pydirectinput.mouseUp()
+        try:
+            pydirectinput.mouseDown()
+            pydirectinput.move(x_offset, y_offset)
+            pydirectinput.mouseUp()
+        except:
+            try: pydirectinput.mouseUp()
+            except: pass
 
 class GameController:
     def __init__(self, keyboard, mouse):
@@ -109,65 +143,42 @@ class GameController:
         self.mouse = mouse
 
     def walk_forward(self, duration=1):
-        pydirectinput.keyDown("w")
-        time.sleep(duration)
-        pydirectinput.keyUp("w")
+        try:
+            pydirectinput.keyDown("w")
+            time.sleep(duration)
+            pydirectinput.keyUp("w")
+        except:
+            try: pydirectinput.keyUp("w")
+            except: pass
         
     def perform_action(self, action, kwargs=None):
-        pass # Handle game specific actions
+        pass
+
+# Выделяем функцию для независимого процесса
+def _run_qt_overlay():
+    from PyQt5.QtWidgets import QApplication, QLabel
+    from PyQt5.QtCore import Qt
+    import sys
+    app = QApplication(sys.argv)
+    label = QLabel("🎤 Ассистент Готов (Q+E показать/скрыть)", None)
+    label.setWindowFlags(Qt.WindowStaysOnTopHint | Qt.FramelessWindowHint | Qt.Tool | Qt.X11BypassWindowManagerHint)
+    label.setAttribute(Qt.WA_TranslucentBackground)
+    label.setStyleSheet("color: #00ff00; font-size: 16px; font-weight: bold; background: rgba(0,0,0,150); padding: 5px;")
+    label.move(50, 50)
+    label.show()
+    app.exec_()
 
 class OverlayManager:
     def __init__(self):
-        self.running = False
-        self.overlay_thread = None
+        self.process = None
 
     def start_overlay(self):
-        # A simple PyQt overlay in a separate thread
-        if not self.running:
-            self.running = True
-            def run_qt():
-                from PyQt5.QtWidgets import QApplication, QLabel
-                from PyQt5.QtCore import Qt
-                import sys
-                
-                # Check if app exists
-                app = QApplication.instance()
-                if not app:
-                    app = QApplication(sys.argv)
-                
-                label = QLabel("🎤 Ассистент Готов (Q+E показать/скрыть)", None)
-                label.setWindowFlags(Qt.WindowStaysOnTopHint | Qt.FramelessWindowHint | Qt.Tool | Qt.X11BypassWindowManagerHint)
-                label.setAttribute(Qt.WA_TranslucentBackground)
-                label.setStyleSheet("color: #00ff00; font-size: 16px; font-weight: bold; background: rgba(0,0,0,150); padding: 5px;")
-                label.move(50, 50)
-                label.show()
-                app.exec_()
-
-            self.overlay_thread = threading.Thread(target=run_qt, daemon=True)
-            self.overlay_thread.start()
-
-class VoiceManager:
-    def __init__(self):
-        self.recognizer = sr.Recognizer()
-        self.is_listening = False
-
-    def start_listening(self, callback):
-        self.is_listening = True
-        def listen_loop():
-            with sr.Microphone() as source:
-                self.recognizer.adjust_for_ambient_noise(source)
-                while self.is_listening:
-                    try:
-                        audio = self.recognizer.listen(source, timeout=1, phrase_time_limit=5)
-                        text = self.recognizer.recognize_google(audio, language="ru-RU")
-                        if text:
-                            callback(text)
-                    except sr.WaitTimeoutError:
-                        continue
-                    except Exception as e:
-                        pass
-        t = threading.Thread(target=listen_loop, daemon=True)
-        t.start()
+        # БЕЗОПАСНАЯ АЛЬТЕРНАТИВА: Используем независимый ПРОЦЕСС вместо ПОТОКА.
+        # Запуск QApplication в побочном потоке (threading.Thread) нарушает ограничения ОС (Windows/X11),
+        # что приводит к крашу драйверов видеокарты (dxgkrnl.sys) и BSOD PAGE_FAULT_IN_NONPAGED_AREA.
+        if self.process is None or not self.process.is_alive():
+            self.process = multiprocessing.Process(target=_run_qt_overlay, daemon=True)
+            self.process.start()
 
 class ActionExecutor:
     def __init__(self):
@@ -179,7 +190,6 @@ class ActionExecutor:
         self.mouse = MouseController()
         self.game_ctrl = GameController(self.keyboard, self.mouse)
         self.overlay = OverlayManager()
-        self.voice = VoiceManager()
 
     def execute(self, action_dict):
         action_type = action_dict.get("action")

@@ -46,7 +46,12 @@ class LocalExecutor:
                         await asyncio.sleep(1)
                         success = True
                     else:
-                        success, msg = self.executor.execute(task) # pass directly if matched
+                        # Fix Event Loop Blocking
+                        # executor.execute can block for up to 20s (launch app, wait for window).
+                        # Calling it synchronously freezes the server and blocks FastAPI WS heartbeat.
+                        loop = asyncio.get_running_loop()
+                        success, inline_msg = await loop.run_in_executor(None, self.executor.execute, task)
+                        msg = inline_msg if inline_msg else msg
 
                     if success:
                         task["status"] = "completed"

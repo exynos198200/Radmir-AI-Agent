@@ -165,19 +165,7 @@ class GameController:
     def perform_action(self, action, kwargs=None):
         pass
 
-# Выделяем функцию для независимого процесса
-def _run_qt_overlay():
-    from PyQt5.QtWidgets import QApplication, QLabel
-    from PyQt5.QtCore import Qt
-    import sys
-    app = QApplication(sys.argv)
-    label = QLabel("🎤 Ассистент Готов (Q+E показать/скрыть)", None)
-    label.setWindowFlags(Qt.WindowStaysOnTopHint | Qt.FramelessWindowHint | Qt.Tool | Qt.X11BypassWindowManagerHint)
-    label.setAttribute(Qt.WA_TranslucentBackground)
-    label.setStyleSheet("color: #00ff00; font-size: 16px; font-weight: bold; background: rgba(0,0,0,150); padding: 5px;")
-    label.move(50, 50)
-    label.show()
-    app.exec_()
+# Overlay logic moved to overlay.py due to multiprocessing BSOD bugs.
 
 class OverlayManager:
     def __init__(self):
@@ -189,23 +177,22 @@ class OverlayManager:
             pass
 
     def toggle_overlay(self):
-        if self.process is None or not self.process.is_alive():
+        if self.process is None or self.process.poll() is not None:
             self.start_overlay()
         else:
             try:
                 self.process.terminate()
-                self.process.join(timeout=1)
                 self.process = None
             except:
                 pass
 
     def start_overlay(self):
-        # БЕЗОПАСНАЯ АЛЬТЕРНАТИВА: Используем независимый ПРОЦЕСС вместо ПОТОКА.
-        # Запуск QApplication в побочном потоке (threading.Thread) нарушает ограничения ОС (Windows/X11),
-        # что приводит к крашу драйверов видеокарты (dxgkrnl.sys) и BSOD PAGE_FAULT_IN_NONPAGED_AREA.
-        if self.process is None or not self.process.is_alive():
-            self.process = multiprocessing.Process(target=_run_qt_overlay, daemon=True)
-            self.process.start()
+        if self.process is None or self.process.poll() is not None:
+            import subprocess
+            import sys
+            import os
+            script_path = os.path.join(os.path.dirname(__file__), '..', 'overlay.py')
+            self.process = subprocess.Popen([sys.executable, script_path])
 
 class ActionExecutor:
     def __init__(self):
@@ -240,7 +227,9 @@ class ActionExecutor:
                 return True, f"Hotkey {keys} pressed"
             elif action_type == "typewrite":
                 text = action_dict.get("text", "")
-                pyautogui.write(text, interval=0.05)
+                import keyboard
+                # pyautogui.write can have issues, keyboard module is more robust for typing
+                keyboard.write(text, delay=0.03)
                 return True, f"Typed text: {text}"
             elif action_type == "mouse_move":
                 self.mouse.move(action_dict.get("x", 0), action_dict.get("y", 0), action_dict.get("relative", False))

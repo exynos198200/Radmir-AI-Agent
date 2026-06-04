@@ -105,7 +105,8 @@ class KeyboardController:
     def press(self, key):
         try:
             if key in ['win', 'windows']:
-                pyautogui.press('win')
+                import keyboard
+                keyboard.send('windows')
             else:
                 pydirectinput.press(key)
         except Exception:
@@ -113,13 +114,17 @@ class KeyboardController:
 
     def hotkey(self, *keys):
         try:
-            mapped_keys = ['win' if k == 'windows' else k for k in keys]
-            pyautogui.hotkey(*mapped_keys)
+            import keyboard
+            mapped = [k.replace('win', 'windows') for k in keys]
+            keyboard.send('+'.join(mapped))
         except Exception:
-            # Гарантированное отжатие клавиш при ошибке (предотвращение "залипания")
-            for k in reversed(keys): 
-                try: pydirectinput.keyUp(k)
-                except: pass
+            try:
+                mapped_keys = ['win' if k == 'windows' else k for k in keys]
+                pyautogui.hotkey(*mapped_keys)
+            except Exception:
+                for k in reversed(keys): 
+                    try: pydirectinput.keyUp(k)
+                    except: pass
 
 class MouseController:
     def click(self, button='left'):
@@ -177,6 +182,22 @@ def _run_qt_overlay():
 class OverlayManager:
     def __init__(self):
         self.process = None
+        try:
+            import keyboard
+            keyboard.add_hotkey('q+e', self.toggle_overlay)
+        except Exception:
+            pass
+
+    def toggle_overlay(self):
+        if self.process is None or not self.process.is_alive():
+            self.start_overlay()
+        else:
+            try:
+                self.process.terminate()
+                self.process.join(timeout=1)
+                self.process = None
+            except:
+                pass
 
     def start_overlay(self):
         # БЕЗОПАСНАЯ АЛЬТЕРНАТИВА: Используем независимый ПРОЦЕСС вместо ПОТОКА.

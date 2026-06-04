@@ -69,19 +69,22 @@ class AgentProcessor:
        "title": "Описание шага", 
        "status": "pending", 
        "tag": "REAL", 
-       "action": "одно из [press, hotkey, launch, mouse_click, mouse_move, overlay_on, game_action, none]", 
+       "action": "одно из [press, hotkey, typewrite, launch, mouse_click, mouse_move, overlay_on, game_action, none]", 
        ...специфичные поля для экшена
     }
   ]
 }
 
 Специфичные поля:
-- press: "key" (например "space", "enter"), "times" (число)
+- press: "key" (например "space", "enter", "win"), "times" (число)
 - hotkey: "keys" (массив строк, например ["win", "r"], ["ctrl", "c"])
-- launch: "program" (путь или команда), "process" (ожидаемый процесс, например "gta_sa.exe")
+- typewrite: "text" (строка, для печати текста)
+- launch: "program" (полный путь к .exe. Либо имя программы для cmd: "chrome", "radmir"), "process" (ожидаемый процесс, например "chrome.exe")
 - mouse_click: "button" ("left", "right")
 - mouse_move: "x" (число), "y" (число), "relative" (boolean)
 - game_action: "cmd" ("walk_forward" и т.д.)
+
+Для запуска специфичных игр, путь к которым неизвестен (например Radmir RP, Minecraft, и т.д.), используй связку: `hotkey ["win"]` -> `typewrite "название игры"` -> `press "enter"`, так как через launch ("start radmir") система может не найти игру без полного пути. Обязательно добавляй шаг на ввод текста! 
 
 Все действия реально выполняются системой, возвращай только теги REAL. Симуляция запрещена."""
             

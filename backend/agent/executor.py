@@ -25,30 +25,17 @@ class LocalExecutor:
                 success, msg = False, "No action executed"
                 action = task.get("action")
                 try:
-                    if action == "press":
+                    if action == "none":
+                        await asyncio.sleep(1)
+                        success = True
+                    elif action == "press":
                         key = task.get("key", "space")
                         times = int(task.get("times", 1))
                         for _ in range(times):
-                            success, msg = self.executor.execute({"action": "press", "key": key})
+                            loop = asyncio.get_running_loop()
+                            success, msg = await loop.run_in_executor(None, self.executor.execute, {"action": "press", "key": key})
                             await asyncio.sleep(0.1)
-                    elif action == "hotkey":
-                        keys = task.get("keys", ["windows", "r"])
-                        success, msg = self.executor.execute({"action": "hotkey", "keys": keys})
-                    elif action == "launch":
-                        prog = task.get("program", "")
-                        proc = task.get("process", prog + ".exe")
-                        success, msg = self.executor.execute({"action": "launch", "program": prog, "process": proc})
-                    elif action == "mouse_click":
-                        success, msg = self.executor.execute({"action": "mouse_click", "button": task.get("button", "left")})
-                    elif action == "game_action":
-                        success, msg = self.executor.execute({"action": "game_action", "cmd": task.get("cmd", "")})
-                    elif action == "none":
-                        await asyncio.sleep(1)
-                        success = True
                     else:
-                        # Fix Event Loop Blocking
-                        # executor.execute can block for up to 20s (launch app, wait for window).
-                        # Calling it synchronously freezes the server and blocks FastAPI WS heartbeat.
                         loop = asyncio.get_running_loop()
                         success, inline_msg = await loop.run_in_executor(None, self.executor.execute, task)
                         msg = inline_msg if inline_msg else msg

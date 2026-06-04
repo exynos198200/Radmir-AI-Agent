@@ -78,6 +78,9 @@ class ApplicationLauncher:
 
     def launch(self, path_or_command, expected_process, expected_window=None):
         try:
+            if not path_or_command.startswith("start ") and not (":\\" in path_or_command or ":/" in path_or_command):
+                path_or_command = f"start {path_or_command}"
+
             subprocess.Popen(path_or_command, shell=True)
             start = time.time()
             running = False
@@ -88,11 +91,11 @@ class ApplicationLauncher:
                 time.sleep(0.5)
             
             if not running:
-                return False, "Процесс не запустился"
+                return False, f"Процесс {expected_process} не запустился"
 
             if expected_window:
                 if not self.window_mgr.wait_for_window(expected_window, 15):
-                    return False, "Окно программы не появилось"
+                    return False, f"Окно программы {expected_window} не появилось"
 
             return True, "Успешно"
         except Exception as e:
@@ -101,14 +104,17 @@ class ApplicationLauncher:
 class KeyboardController:
     def press(self, key):
         try:
-            pydirectinput.press(key)
+            if key in ['win', 'windows']:
+                pyautogui.press('win')
+            else:
+                pydirectinput.press(key)
         except Exception:
             pass
 
     def hotkey(self, *keys):
         try:
-            for k in keys: pydirectinput.keyDown(k)
-            for k in reversed(keys): pydirectinput.keyUp(k)
+            mapped_keys = ['win' if k == 'windows' else k for k in keys]
+            pyautogui.hotkey(*mapped_keys)
         except Exception:
             # Гарантированное отжатие клавиш при ошибке (предотвращение "залипания")
             for k in reversed(keys): 
@@ -211,6 +217,10 @@ class ActionExecutor:
                     time.sleep(0.5)
                     return True, "Hotkey win+r pressed, window not strictly verified here yet"
                 return True, f"Hotkey {keys} pressed"
+            elif action_type == "typewrite":
+                text = action_dict.get("text", "")
+                pyautogui.write(text, interval=0.05)
+                return True, f"Typed text: {text}"
             elif action_type == "mouse_move":
                 self.mouse.move(action_dict.get("x", 0), action_dict.get("y", 0), action_dict.get("relative", False))
                 return True, "Mouse moved"
